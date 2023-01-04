@@ -40,6 +40,7 @@
 #include <libraw.h>
 #include <jpeglib.h>
 
+using ControlList = libcamera::ControlList;
 
 #define CONTROL_TAB "Controls"
 
@@ -549,23 +550,41 @@ bool INDILibCamera::Connect()
     {
         m_StillApp.reset(new LibcameraApp(std::make_unique<StillOptions>()));
 
+        auto camera = cameraManager->cameras()[0];
+
+        const ControlList props = camera->properties();
+
+        auto sensorSize = (*props.get(properties::PixelArrayActiveAreas))[0];
+        // uncoment line below if above does not work
+        // auto sensorSize = libcamera::Rectangle(0,0,1920,1080);
+
+        PrimaryCCD.setResolution(sensorSize.width, sensorSize.height);
+        LOGF_INFO("PixelArraySize %i x %i", sensorSize.width, sensorSize.height);
+
+        auto pixelSize = props.get(properties::UnitCellSize);
+        // uncoment line below if above does not work
+        // auto *pixelSize = new libcamera::Size(2550, 2550);
+
+        auto pixelSizeX = pixelSize->width / 1000.0;
+        auto pixelSizeY = pixelSize->height / 1000.0;
+        PrimaryCCD.setPixelSize(pixelSizeX, pixelSizeY);
+        LOGF_INFO("UnitCellSize %f x %f", pixelSizeX, pixelSizeY);
+
         auto stillOptions = static_cast<StillOptions *>(m_StillApp->GetOptions());
         //stillOptions->Parse(0, nullptr);
         stillOptions->immediate = true;
         stillOptions->nopreview = true;
-        stillOptions->width = 1920;
-        stillOptions->height = 1080;
+        stillOptions->width = sensorSize.width;
+        stillOptions->height = sensorSize.height;
         stillOptions->camera = CameraSP.findOnSwitchIndex();
         //stillOptions->Print();
         //m_StillApp->OpenCamera();
-        PrimaryCCD.setResolution(1920,1080);
-        PrimaryCCD.setPixelSize(2.55, 2.55);
 
         m_VideoApp.reset(new LibcameraEncoder());
         VideoOptions* videoOptions = m_VideoApp->GetOptions();
         videoOptions->nopreview = true;
-        videoOptions->width = 1920;
-        videoOptions->height = 1080;
+        videoOptions->width = sensorSize.width;
+        videoOptions->height = sensorSize.height;
         videoOptions->camera = CameraSP.findOnSwitchIndex();
         //m_VideoApp->OpenCamera();
 
